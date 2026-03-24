@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import static com.chtrembl.petstoreapp.config.Constants.CATEGORY;
 import static com.chtrembl.petstoreapp.config.Constants.OPERATION;
@@ -65,6 +66,12 @@ public class ProductManagementService {
 
             log.info("Successfully retrieved {} products for category {} with tags {} [RequestID: {}, TraceID: {}]",
                     products.size(), category, tags, requestId, traceId);
+
+            this.sessionUser.getTelemetryClient().trackEvent(
+                "Amount of products",
+                this.sessionUser.getCustomEventProperties(),
+                Map.of("amount", Integer.valueOf(products.size()).doubleValue())
+            );
 
             return products;
         } catch (FeignException fe) {
