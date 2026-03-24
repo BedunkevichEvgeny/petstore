@@ -73,6 +73,9 @@ public class ProductManagementService {
                 Map.of("amount", Integer.valueOf(products.size()).doubleValue())
             );
 
+            log.info("Custom Successfully retrieved {} products for category {} with tags {} [RequestID: {}, TraceID: {}]",
+                products.size(), category, tags, requestId, traceId);
+
             return products;
         } catch (FeignException fe) {
             log.error("Feign error retrieving products [RequestID: {}, TraceID: {}, Category: {}, HTTP: {}, Message: {}]",
