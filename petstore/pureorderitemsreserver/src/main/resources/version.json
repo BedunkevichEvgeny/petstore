@@ -1,0 +1,5 @@
+{
+  "version": "${project.version}",
+  "buildTime": "${build.timestamp}",
+  "description": "Pure Azure Functions Order Items Reserver - No Spring Boot"
+}

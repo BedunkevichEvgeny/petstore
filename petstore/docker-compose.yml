@@ -35,3 +35,13 @@ services:
       - "8083:8083"
     env_file:
       - .env
+
+  orderitemsreserver:
+    build:
+      context: ./orderitemsreserver
+    ports:
+      - "8084:8084"
+    env_file:
+      - .env
+    environment:
+      - ORDERITEMSRESERVER_SERVER_PORT=8084

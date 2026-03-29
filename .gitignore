@@ -26,3 +26,7 @@ hs_err_pid*
 
 sandbox/**/*
 !webapp.zip
+
+.claude
+.codemie
+*.dockerignore
