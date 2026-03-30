@@ -6,7 +6,8 @@ This is a multi-module Maven project for the CloudX Java Azure Dev course, imple
 
 - **Type**: Microservices-based Spring Boot application (educational project)
 - **Build Tool**: Maven 3.9.8, Java 21
-- **Core Stack**: Spring Boot 3.5.0, Spring Cloud OpenFeign, Azure Application Insights
+- **Core Stack**: Spring Boot 3.5.0, Spring Cloud OpenFeign, Spring Data JPA, Azure Application Insights
+- **Database**: PostgreSQL 17 (for Product Service)
 - **Deployment**: Designed for Azure App Service with Application Insights monitoring
 
 ## Build and Development Commands
@@ -54,9 +55,10 @@ k6 run tests/BasicScaleTest.js
 
 - **PetStoreApp** (port 8080): Frontend web application using Thymeleaf, acts as BFF (Backend for Frontend)
 - **PetService** (port 8081): Pet data microservice with Swagger UI
-- **ProductService** (port 8082): Product catalog microservice with hardcoded data
+- **ProductService** (port 8082): Product catalog microservice with PostgreSQL 17 backend
 - **OrderService** (port 8083): Order management microservice
 - **OrderItemsReserver** (port 8084): Azure Function-style HTTP service that reserves order items by uploading JSON to Azure Blob Storage
+- **PostgreSQL** (port 5432): PostgreSQL 17 database for Product Service (Docker Compose only)
 
 ### Key Architectural Patterns
 
@@ -103,6 +105,29 @@ k6 run tests/BasicScaleTest.js
 - Cache named "currentUsers"
 - Configured in application configuration classes
 
+#### 6. Database Persistence (Product Service)
+
+- **ORM**: Spring Data JPA with Hibernate
+- **Database**: PostgreSQL 17 (Alpine Linux image in Docker)
+- **Connection Pool**: HikariCP (Spring Boot default)
+- **Entities**: Product, Category, Tag with JPA relationships
+  - `Product` has `@ManyToOne` relationship with `Category`
+  - `Product` has `@ManyToMany` relationship with `Tag` (via `product_tags` junction table)
+- **Repository Pattern**: `ProductRepository extends JpaRepository<Product, Long>`
+- **Schema Management**:
+  - Hibernate DDL auto mode configured via `JPA_DDL_AUTO` environment variable (default: `update`)
+  - Initial data loaded via `src/main/resources/data.sql` with PostgreSQL-specific syntax
+  - Uses `ON CONFLICT DO NOTHING` for idempotent data initialization
+- **Configuration**:
+  - Database connection via environment variables (see `.env.sample`)
+  - Docker Compose: Uses container hostname `postgres:5432`
+  - Local development: Uses `localhost:5432` or Azure PostgreSQL
+- **Location**: `petstore/petstoreproductservice/`
+  - Models: `src/main/java/com/chtrembl/petstore/product/model/`
+  - Repository: `src/main/java/com/chtrembl/petstore/product/repository/`
+  - Service: `src/main/java/com/chtrembl/petstore/product/service/`
+  - Data initialization: `src/main/resources/data.sql`
+
 ### PetStoreApp Package Structure
 
 ```
@@ -121,11 +146,65 @@ petstoreapp/src/main/java/com/chtrembl/petstoreapp/
 - **Service URLs**: `petstore/.env` (create from `.env.sample` template)
 - **Application Insights config**: `petstore/petstoreapp/src/main/resources/applicationinsights.json`
 - **Spring config**: `petstore/petstoreapp/src/main/resources/application.yml`
+- **Database config**: `petstore/petstoreproductservice/src/main/resources/application.yml` (PostgreSQL JDBC)
+- **Database initialization**: `petstore/petstoreproductservice/src/main/resources/data.sql`
 - **Root POM**: `pom.xml` (aggregator for all modules)
 - **Version tracking**: Each service has `src/main/resources/version.json`
 - **Azure Storage config**: `petstore/orderitemsreserver/src/main/resources/application.yml` (for blob storage)
 
 ## Development Workflow Notes
+
+### Working with PostgreSQL Database (Product Service)
+
+**Local Development Setup:**
+```bash
+# Option 1: Docker Compose (recommended)
+cd petstore
+cp .env.sample .env  # Configure database credentials
+docker-compose up -d postgres  # Start PostgreSQL container
+docker-compose up -d petstoreproductservice  # Start product service
+
+# Option 2: Local PostgreSQL installation
+# Install PostgreSQL 17 and create database:
+createdb petstore
+# Update .env with POSTGRES_URL=jdbc:postgresql://localhost:5432/petstore
+```
+
+**Database Access:**
+```bash
+# Connect to PostgreSQL in Docker
+docker-compose exec postgres psql -U postgres -d petstore
+
+# Verify tables and data
+\dt  # List tables: products, categories, tags, product_tags
+SELECT * FROM products;
+SELECT * FROM categories;
+```
+
+**Environment Variables:**
+- `POSTGRES_URL`: JDBC connection string (default: `jdbc:postgresql://localhost:5432/petstore`)
+- `POSTGRES_USER`: Database username (default: `postgres`)
+- `POSTGRES_PASSWORD`: Database password (default: `postgres`)
+- `JPA_DDL_AUTO`: Hibernate DDL mode - `update`, `create`, `create-drop`, `validate` (default: `update`)
+- `JPA_SHOW_SQL`: Enable SQL logging for debugging (default: `false`)
+- `SQL_INIT_MODE`: Control data.sql execution - `always`, `never`, `embedded` (default: `always`)
+
+**Working with JPA Entities:**
+- All entities use `@GeneratedValue(strategy = GenerationType.IDENTITY)` for auto-increment IDs
+- Product-Category relationship: `@ManyToOne` with eager fetching
+- Product-Tag relationship: `@ManyToMany` via `product_tags` junction table
+- Status enum stored as `@Enumerated(EnumType.STRING)` in database
+
+**Adding New Products:**
+- Use JPA repository methods: `productRepository.save(product)`
+- Or add to `data.sql` for initial seed data
+- Ensure foreign key constraints are satisfied (category and tags must exist)
+
+**Azure Deployment:**
+- Use Azure Database for PostgreSQL Flexible Server
+- Update connection string in Azure App Service configuration
+- Set `JPA_DDL_AUTO=validate` in production (never `update` or `create`)
+- Consider using Azure Key Vault for database credentials
 
 ### Adding New Endpoints
 
@@ -166,9 +245,12 @@ curl http://localhost:8080/actuator/health
 
 # Service-specific health
 curl http://localhost:8081/actuator/health  # PetService
-curl http://localhost:8082/actuator/health  # ProductService
+curl http://localhost:8082/actuator/health  # ProductService (includes database health)
 curl http://localhost:8083/actuator/health  # OrderService
 curl http://localhost:8084/actuator/health  # OrderItemsReserver
+
+# Database connectivity check
+docker-compose exec postgres pg_isready -U postgres
 
 # Swagger UI (backend services)
 # PetService: http://localhost:8081/swagger-ui/

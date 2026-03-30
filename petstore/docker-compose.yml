@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: petstore-postgres
+    environment:
+      - POSTGRES_DB=${DATABASE_name:-petstoreproductservice_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   petstoreapp:
     build:
       context: ./petstoreapp
@@ -19,6 +36,15 @@ services:
       - "8081:8081"
     env_file:
       - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_PET_URL=postgres
+      - DATABASE_PET_PORT=5432
+      - DATABASE_PET_name=${DATABASE_PET_name:-petstorepetservice_db}
+      - POSTGRES_PET_USER=${POSTGRES_PET_USER:-postgres}
+      - POSTGRES_PET_PASSWORD=${POSTGRES_PET_PASSWORD:-postgres}
 
   petstoreproductservice:
     build:
@@ -27,6 +53,15 @@ services:
       - "8082:8082"
     env_file:
       - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_URL=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_name=${DATABASE_name:-petstoreproductservice_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
 
   petstoreorderservice:
     build:
@@ -45,3 +80,6 @@ services:
       - .env
     environment:
       - ORDERITEMSRESERVER_SERVER_PORT=8084
+
+volumes:
+  postgres-data:
