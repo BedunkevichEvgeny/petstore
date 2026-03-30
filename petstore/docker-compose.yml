@@ -70,6 +70,10 @@ services:
       - "8083:8083"
     env_file:
       - .env
+    environment:
+      - AZURE_COSMOS_ENDPOINT=${AZURE_COSMOS_ENDPOINT}
+      - AZURE_COSMOS_KEY=${AZURE_COSMOS_KEY}
+      - AZURE_COSMOS_DATABASE=${AZURE_COSMOS_DATABASE:-petstoreorderservice}
 
   orderitemsreserver:
     build:

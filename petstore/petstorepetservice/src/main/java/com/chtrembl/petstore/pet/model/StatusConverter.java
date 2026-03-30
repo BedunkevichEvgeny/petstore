@@ -16,8 +16,7 @@ public class StatusConverter implements AttributeConverter<Pet.Status, String> {
         if (status == null) {
             return null;
         }
-        // Store uppercase enum constant name in database
-        return status.name();
+        return status.getValue();
     }
 
     @Override

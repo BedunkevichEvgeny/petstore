@@ -6,8 +6,10 @@ This is a multi-module Maven project for the CloudX Java Azure Dev course, imple
 
 - **Type**: Microservices-based Spring Boot application (educational project)
 - **Build Tool**: Maven 3.9.8, Java 21
-- **Core Stack**: Spring Boot 3.5.0, Spring Cloud OpenFeign, Spring Data JPA, Azure Application Insights
-- **Database**: PostgreSQL 17 (for Product Service)
+- **Core Stack**: Spring Boot 3.5.0, Spring Cloud OpenFeign, Spring Data JPA, Azure Application Insights, Azure Cosmos DB
+- **Databases**:
+  - PostgreSQL 17 (for Product Service and Pet Service)
+  - Azure Cosmos DB (for Order Service)
 - **Deployment**: Designed for Azure App Service with Application Insights monitoring
 
 ## Build and Development Commands
@@ -56,9 +58,10 @@ k6 run tests/BasicScaleTest.js
 - **PetStoreApp** (port 8080): Frontend web application using Thymeleaf, acts as BFF (Backend for Frontend)
 - **PetService** (port 8081): Pet data microservice with Swagger UI
 - **ProductService** (port 8082): Product catalog microservice with PostgreSQL 17 backend
-- **OrderService** (port 8083): Order management microservice
+- **OrderService** (port 8083): Order management microservice with Azure Cosmos DB backend
 - **OrderItemsReserver** (port 8084): Azure Function-style HTTP service that reserves order items by uploading JSON to Azure Blob Storage
-- **PostgreSQL** (port 5432): PostgreSQL 17 database for Product Service (Docker Compose only)
+- **PostgreSQL** (port 5432): PostgreSQL 17 database for Product and Pet Services (Docker Compose only)
+- **Azure Cosmos DB**: NoSQL database for Order Service (cloud-only, requires Azure account or local emulator)
 
 ### Key Architectural Patterns
 
@@ -83,14 +86,40 @@ k6 run tests/BasicScaleTest.js
 - Shopping cart state maintained in session
 - Located in: `petstoreapp/src/main/java/com/chtrembl/petstoreapp/model/User.java`
 
-#### 3. Security (Toggle-based)
+#### 3. Order Persistence with Azure Cosmos DB
+
+- **ORM**: Spring Data Cosmos with Azure Cosmos DB SDK
+- **Database**: Azure Cosmos DB (NoSQL document database)
+- **Container**: `orders` container with order documents
+- **Entities**: Order entity with embedded Product list
+  - `Order` uses `@Id` and `@PartitionKey` on the order ID field
+  - `Order` marked with `@Container(containerName = "orders")`
+  - Products stored as nested JSON documents within order
+- **Repository Pattern**: `OrderRepository extends CosmosRepository<Order, String>`
+- **Configuration**:
+  - Cosmos DB connection via environment variables (see `.env.sample`)
+  - Local development: Use Azure Cosmos DB Emulator (https://localhost:8081)
+  - Azure deployment: Use Azure Cosmos DB account
+- **Location**: `petstore/petstoreorderservice/`
+  - Model: `src/main/java/com/chtrembl/petstore/order/model/Order.java`
+  - Repository: `src/main/java/com/chtrembl/petstore/order/repository/OrderRepository.java`
+  - Service: `src/main/java/com/chtrembl/petstore/order/service/OrderService.java`
+  - Configuration: `src/main/java/com/chtrembl/petstore/order/config/CosmosConfig.java`
+
+**Migration from Cache to Cosmos DB:**
+- Previously used Spring Cache with `@Cacheable` annotations (version ≤ 0.0.3)
+- Migrated to Azure Cosmos DB for persistent order storage in version 0.0.4
+- Products fetched from Product Service are still cached in-memory for performance
+- Order statistics available via `CacheService.getOrdersCacheSize()` (returns Cosmos DB count)
+
+#### 4. Security (Toggle-based)
 
 - Enabled via `PETSTORE_SECURITY_ENABLED` environment variable
 - OAuth2 with Microsoft Entra External ID
 - Security config in: `petstoreapp/src/main/java/com/chtrembl/petstoreapp/security/`
 - When disabled, uses a default test user session
 
-#### 4. Monitoring with Azure Application Insights
+#### 5. Monitoring with Azure Application Insights
 
 - **Custom telemetry wrapper**: `PetStoreTelemetryClient`
 - Location: `petstoreapp/src/main/java/com/chtrembl/petstoreapp/telemetry/`
@@ -99,13 +128,14 @@ k6 run tests/BasicScaleTest.js
 - **Important**: Use the wrapper instead of direct Application Insights API for consistency
 - Custom properties automatically include session context (session ID, user info)
 
-#### 5. Caching
+#### 6. Caching
 
-- Spring Cache with Caffeine provider
-- Cache named "currentUsers"
-- Configured in application configuration classes
+- **Order Service**: Orders persisted in Azure Cosmos DB (no caching)
+- **Product Service data**: Cached in-memory with Spring Cache (ConcurrentMapCacheManager)
+- Cache named "products" for Product Service API responses
+- Configured in `ProductCacheConfig.java` (Order Service)
 
-#### 6. Database Persistence (Product Service)
+#### 7. Database Persistence (Product Service)
 
 - **ORM**: Spring Data JPA with Hibernate
 - **Database**: PostgreSQL 17 (Alpine Linux image in Docker)
@@ -146,13 +176,77 @@ petstoreapp/src/main/java/com/chtrembl/petstoreapp/
 - **Service URLs**: `petstore/.env` (create from `.env.sample` template)
 - **Application Insights config**: `petstore/petstoreapp/src/main/resources/applicationinsights.json`
 - **Spring config**: `petstore/petstoreapp/src/main/resources/application.yml`
-- **Database config**: `petstore/petstoreproductservice/src/main/resources/application.yml` (PostgreSQL JDBC)
-- **Database initialization**: `petstore/petstoreproductservice/src/main/resources/data.sql`
+- **PostgreSQL config**: `petstore/petstoreproductservice/src/main/resources/application.yml` (Product Service)
+- **PostgreSQL initialization**: `petstore/petstoreproductservice/src/main/resources/data.sql`
+- **Cosmos DB config**: `petstore/petstoreorderservice/src/main/resources/application.yml` (Order Service)
 - **Root POM**: `pom.xml` (aggregator for all modules)
 - **Version tracking**: Each service has `src/main/resources/version.json`
 - **Azure Storage config**: `petstore/orderitemsreserver/src/main/resources/application.yml` (for blob storage)
 
 ## Development Workflow Notes
+
+### Working with Azure Cosmos DB (Order Service)
+
+**Local Development Setup:**
+```bash
+# Option 1: Azure Cosmos DB Emulator (Windows only, recommended for local dev)
+# Download from: https://aka.ms/cosmosdb-emulator
+# After installation, emulator runs at: https://localhost:8081
+# Default key is well-known emulator key (see .env.sample)
+
+# Configure in .env:
+AZURE_COSMOS_ENDPOINT=https://localhost:8081
+AZURE_COSMOS_KEY=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+AZURE_COSMOS_DATABASE=petstoreorderservice
+
+# Option 2: Azure Cosmos DB in Azure (for integration testing)
+# Create Cosmos DB account in Azure Portal
+# Update .env with your account endpoint and key
+```
+
+**Environment Variables:**
+- `AZURE_COSMOS_ENDPOINT`: Cosmos DB endpoint URL (default: `https://localhost:8081` for emulator)
+- `AZURE_COSMOS_KEY`: Cosmos DB access key (default: emulator well-known key)
+- `AZURE_COSMOS_DATABASE`: Database name (default: `petstoreorderservice`)
+
+**Working with Cosmos DB Documents:**
+- All orders stored as JSON documents in `orders` container
+- Order ID serves as both document ID and partition key
+- Nested products stored as JSON array within order document
+- No schema migrations needed - NoSQL flexibility
+
+**Repository Operations:**
+- Use Spring Data Cosmos repositories: `orderRepository.save(order)`
+- Find by ID: `orderRepository.findById(orderId)`
+- Count orders: `orderRepository.count()`
+- All operations handled by `OrderService`
+
+**Azure Deployment:**
+- Create Azure Cosmos DB account (SQL API)
+- Create database named `petstoreorderservice`
+- Container `orders` will be auto-created by Spring Data Cosmos
+- Set partition key to `/id`
+- Update Azure App Service configuration with Cosmos DB endpoint and key
+- Consider using Azure Key Vault for Cosmos DB key
+
+**Monitoring:**
+- Query metrics enabled via `populate-query-metrics: true`
+- Monitor RU (Request Unit) consumption in Azure Portal
+- Check query performance and indexing in Cosmos DB metrics
+
+**Testing Order Service Locally:**
+1. Install and start Azure Cosmos DB Emulator (Windows) or use Azure Cosmos DB
+2. Configure `.env` with Cosmos DB connection details
+3. Start Order Service: `cd petstoreorderservice && mvn spring-boot:run`
+4. Create order: `POST /petstoreorderservice/v2/store/order`
+5. Retrieve order: `GET /petstoreorderservice/v2/store/order/{orderId}`
+6. View order count: `GET /petstoreorderservice/v2/store/info` (returns `ordersCacheSize` from Cosmos DB)
+
+**Important Notes:**
+- Order Service requires Cosmos DB connection to function
+- Unlike Product Service (PostgreSQL), Cosmos DB is cloud-only (except emulator)
+- Docker Compose cannot easily run Cosmos DB locally (use emulator on host)
+- For CI/CD pipelines, use Azure Cosmos DB account, not emulator
 
 ### Working with PostgreSQL Database (Product Service)
 
@@ -287,9 +381,10 @@ Each module has its own `pom.xml` inheriting from the root POM.
 - This is an **educational project** - focus on clarity and Azure integration patterns
 - **Application Insights integration** is a key learning objective - maintain telemetry tracking
 - **Azure Blob Storage integration** in OrderItemsReserver demonstrates serverless patterns
+- **Azure Cosmos DB integration** in OrderService demonstrates NoSQL persistence patterns
 - Environment variable configuration is critical for multi-environment deployment
 - Security can be toggled for local development vs. Azure deployment
-- The project demonstrates cloud-native patterns (externalized config, health checks, distributed tracing, blob storage)
+- The project demonstrates cloud-native patterns (externalized config, health checks, distributed tracing, blob storage, NoSQL databases)
 
 ### OrderItemsReserver Service Notes
 

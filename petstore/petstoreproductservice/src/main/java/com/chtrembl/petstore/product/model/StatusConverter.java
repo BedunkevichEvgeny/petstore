@@ -16,8 +16,7 @@ public class StatusConverter implements AttributeConverter<Product.Status, Strin
         if (status == null) {
             return null;
         }
-        // Store uppercase enum constant name in database
-        return status.name();
+        return status.getValue();
     }
 
     @Override
