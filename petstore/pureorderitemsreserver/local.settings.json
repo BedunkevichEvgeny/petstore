@@ -4,6 +4,9 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "java",
     "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
-    "AZURE_STORAGE_CONTAINER_NAME": "order-items"
+    "AZURE_STORAGE_CONTAINER_NAME": "order-items",
+    "ORDERITEMSRESERVER_SERVICEBUS_CONNECTION": "some string",
+    "ORDERITEMSRESERVER_QUEUE_NAME": "user-order",
+    "ORDERITEMSRESERVER_ERROR_QUEUE_NAME": "error-store-the-order"
   }
 }

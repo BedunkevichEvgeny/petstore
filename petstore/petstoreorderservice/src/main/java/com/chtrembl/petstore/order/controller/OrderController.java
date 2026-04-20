@@ -3,7 +3,6 @@ package com.chtrembl.petstore.order.controller;
 import com.chtrembl.petstore.order.service.OrderItemsReserverService;
 import com.chtrembl.petstore.order.model.Order;
 import com.chtrembl.petstore.order.model.OrderItemsRequest;
-import com.chtrembl.petstore.order.model.OrderItemsResponse;
 import com.chtrembl.petstore.order.model.Product;
 import com.chtrembl.petstore.order.service.OrderService;
 import com.chtrembl.petstore.order.service.ProductService;
@@ -70,20 +69,14 @@ public class OrderController {
         try {
             OrderItemsRequest reservationRequest = OrderItemsRequest.fromOrder(updatedOrder);
 
-            log.info("Calling OrderItemsReserver Azure Function for order: {}", updatedOrder.getId());
+            log.info("Queueing order reservation message for order: {}", updatedOrder.getId());
 
-            OrderItemsResponse response = orderItemsReserverService.reserveOrderItems(reservationRequest);
-
-            if (response.isSuccess()) {
-                log.info("Order items reserved successfully in Azure Blob Storage. Order ID: {}", response.getSessionId());
-            } else {
-                log.warn("Order items reservation returned non-success status: {} - {}",
-                    response.getStatus(), response.getMessage());
-            }
+            orderItemsReserverService.reserveOrderItems(reservationRequest);
+            log.info("Order reservation message queued successfully. Order ID: {}", updatedOrder.getId());
 
         } catch (Exception azureFunctionEx) {
-            // Log but don't fail the order if Azure Function call fails
-            log.error("Failed to call OrderItemsReserver Azure Function for order {}: ",
+            // Log but don't fail the order if queue publishing fails
+            log.error("Failed to queue OrderItemsReserver message for order {}: ",
                 updatedOrder.getId(), azureFunctionEx);
             log.warn("Continuing with order processing despite reservation failure");
         }
