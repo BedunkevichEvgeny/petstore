@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderItemsReserverService {
 
     private final BlobStorageService blobStorageService;
+    private final ErrorMessageSender errorMessageSender;
 
     public OrderResponse reserveOrderItems(OrderRequest request) {
         try {
@@ -27,11 +28,13 @@ public class OrderItemsReserverService {
 
         } catch (Exception e) {
             log.error("Failed to reserve order items for session: {}", request.getSessionId(), e);
-            return new OrderResponse(
+            var response = new OrderResponse(
                     request.getSessionId(),
                     "ERROR",
                     "Failed to reserve order items: " + e.getMessage()
             );
+            errorMessageSender.sendMessage(response);
+            return response;
         }
     }
 

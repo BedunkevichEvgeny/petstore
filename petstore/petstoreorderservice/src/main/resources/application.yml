@@ -16,7 +16,8 @@ petstore:
     product:
       url: ${PETSTOREPRODUCTSERVICE_URL:http://localhost:8082}
     orderitemsreserver:
-      url: ${ORDERITEMSRESERVER_URL:http://localhost:7071}
+      queue-name: ${ORDERITEMSRESERVER_QUEUE_NAME:user-order}
+      connection-string: ${ORDERITEMSRESERVER_SERVICEBUS_CONNECTION:null}
 
 springdoc:
   api-docs:

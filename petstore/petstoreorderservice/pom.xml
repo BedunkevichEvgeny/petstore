@@ -13,7 +13,7 @@
     <artifactId>petstoreorderservice</artifactId>
     <packaging>jar</packaging>
     <name>petstoreorderservice</name>
-    <version>0.0.4-with-cosmos-db</version>
+    <version>0.0.5-with-service-bus</version>
 
     <properties>
         <java.version>21</java.version>
@@ -23,7 +23,21 @@
         <lombok.version>1.18.36</lombok.version>
         <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss</maven.build.timestamp.format>
         <httpclient.version>4.5.14</httpclient.version>
+        <spring.cloud.azure.version>5.20.0</spring.cloud.azure.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Cloud Azure BOM -->
+            <dependency>
+                <groupId>com.azure.spring</groupId>
+                <artifactId>spring-cloud-azure-dependencies</artifactId>
+                <version>${spring.cloud.azure.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -42,8 +56,18 @@
         <dependency>
             <groupId>com.azure.spring</groupId>
             <artifactId>spring-cloud-azure-starter-data-cosmos</artifactId>
-            <version>5.19.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.azure.spring</groupId>
+            <artifactId>spring-cloud-azure-starter-servicebus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.azure.spring</groupId>
+            <artifactId>spring-messaging-azure-servicebus</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>

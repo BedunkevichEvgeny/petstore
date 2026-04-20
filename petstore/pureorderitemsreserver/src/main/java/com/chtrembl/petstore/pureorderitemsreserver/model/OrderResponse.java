@@ -19,4 +19,12 @@ public class OrderResponse implements Serializable {
         this.status = "SUCCESS";
         this.message = "Order items reserved successfully";
     }
+
+    public boolean isSuccess() {
+        return "SUCCESS".equals(status);
+    }
+
+    public boolean isFailure() {
+        return !isSuccess();
+    }
 }
