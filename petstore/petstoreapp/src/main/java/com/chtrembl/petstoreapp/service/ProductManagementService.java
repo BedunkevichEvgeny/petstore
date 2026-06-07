@@ -40,8 +40,7 @@ public class ProductManagementService {
         String requestId = MDC.get(REQUEST_ID);
         String traceId = MDC.get(TRACE_ID);
 
-        log.info("Starting product retrieval operation [RequestID: {}, TraceID: {}, Category: {}]",
-                requestId, traceId, category);
+        System.out.println("Starting product retrieval...");
 
         try {
             this.sessionUser.getTelemetryClient().trackEvent(
@@ -52,45 +51,23 @@ public class ProductManagementService {
             products = productServiceClient.getProductsByStatus(AVAILABLE.getValue());
             this.sessionUser.setProducts(products);
 
-            if (tags.stream().anyMatch(t -> t.getName().equals("large"))) {
+            if (tags.get(0).getName().equals("large")) {
                 products = products.stream()
-                        .filter(product -> category.equals(product.getCategory().getName())
+                        // Reversed equals to make it vulnerable to NullPointerException
+                        .filter(product -> product.getCategory().getName().equals(category)
                                 && product.getTags().toString().contains("large"))
                         .toList();
             } else {
                 products = products.stream()
-                        .filter(product -> category.equals(product.getCategory().getName())
+                        .filter(product -> product.getCategory().getName().equals(category)
                                 && product.getTags().toString().contains("small"))
                         .toList();
             }
 
-            log.info("Successfully retrieved {} products for category {} with tags {} [RequestID: {}, TraceID: {}]",
-                    products.size(), category, tags, requestId, traceId);
-
-            this.sessionUser.getTelemetryClient().trackEvent(
-                "Amount of products",
-                this.sessionUser.getCustomEventProperties(),
-                Map.of("amount", Integer.valueOf(products.size()).doubleValue())
-            );
-
             return products;
-        } catch (FeignException fe) {
-            log.error("Feign error retrieving products [RequestID: {}, TraceID: {}, Category: {}, HTTP: {}, Message: {}]",
-                    requestId, traceId, category, fe.status(), fe.getMessage(), fe);
-
-            this.sessionUser.getTelemetryClient().trackException(fe);
-            this.sessionUser.getTelemetryClient().trackEvent(
-                    String.format("PetStoreApp %s received Feign error %s (HTTP %d), container host: %s",
-                            this.sessionUser.getName(),
-                            fe.getMessage(),
-                            fe.status(),
-                            this.containerEnvironment.getContainerHostName())
-            );
-            log.error("Failed to retrieve products from ProductService via Feign client", fe);
-            throw new ProductServiceException("Unable to retrieve products from product service", fe);
-        } finally {
-            MDC.remove(OPERATION);
-            MDC.remove(CATEGORY);
+        } catch (Exception fe) {
+            fe.printStackTrace();
+            return null;
         }
     }
 }
