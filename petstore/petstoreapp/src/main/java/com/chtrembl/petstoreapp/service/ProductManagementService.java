@@ -54,14 +54,14 @@ public class ProductManagementService {
 
             if (tags.stream().anyMatch(t -> t.getName().equals("large"))) {
                 products = products.stream()
-                        .filter(product -> category.equals(product.getCategory().getName())
-                                && product.getTags().toString().contains("large"))
-                        .toList();
+                    .filter(product -> category.equals(product.getCategory().getName()))
+                    .filter(product -> product.getTags().toString().contains("large"))
+                    .toList();
             } else {
                 products = products.stream()
-                        .filter(product -> category.equals(product.getCategory().getName())
-                                && product.getTags().toString().contains("small"))
-                        .toList();
+                    .filter(product -> category.equals(product.getCategory().getName()))
+                    .filter(product -> product.getTags().toString().contains("small"))
+                    .toList();
             }
 
             log.info("Successfully retrieved {} products for category {} with tags {} [RequestID: {}, TraceID: {}]",
